@@ -1,0 +1,25 @@
+{
+  "name": "heads-up",
+  "version": "1.0.0",
+  "description": "Multiplayer mobile-friendly Heads Up guessing game",
+  "main": "server.js",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RommyChristensen/heads-up.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RommyChristensen/heads-up/issues"
+  },
+  "homepage": "https://github.com/RommyChristensen/heads-up#readme",
+  "dependencies": {
+    "express": "^4.22.3",
+    "socket.io": "^4.8.4"
+  }
+}
