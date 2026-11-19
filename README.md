@@ -29,3 +29,14 @@ Guesses ignore case, punctuation and accents. Small typos are accepted, and so a
 - `server.js`: Express static server and Socket.IO events
 - `src/game.js`: room and game logic (no networking, unit tested). The server sends each player a version of the state with their own character removed, so it can't be found in the browser's dev tools.
 - `public/`: the client, written in plain HTML/CSS/JS
+
+## Deploy to Render (free)
+
+The repo includes a `render.yaml` Blueprint.
+
+1. Sign in at [render.com](https://render.com) with GitHub.
+2. Click **New → Blueprint** and pick this repository (allow Render's GitHub app to access it if asked).
+3. Choose the branch that has the code, then click **Apply**. The first build takes about 2 minutes.
+4. Open the URL Render gives you (e.g. `https://heads-up-xxxx.onrender.com`) and share it with your friends.
+
+Every push to that branch redeploys automatically. On the free plan the service sleeps after 15 minutes without traffic, so the first visit after that takes about 30 seconds to load. A restart or redeploy ends any game in progress.
