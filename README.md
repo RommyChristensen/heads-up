@@ -22,7 +22,7 @@ To play on phones, open the server's address (e.g. `http://<your-computer-ip>:30
 - **End:** the game ends when only one player is still guessing. The host can then send everyone back to the lobby for another round.
 - **Reconnects:** each device keeps a player id in local storage. If you refresh or lose connection, you get your seat back. In the lobby, a player who stays offline for 30 seconds is removed. During a game, offline players are skipped when picking whose turn is next.
 
-Guesses ignore case, punctuation and accents. Small typos are accepted, and so are common aliases ("Peter Parker" for Spider-Man). Characters are listed in `src/characters.js`.
+Guesses ignore case, punctuation and accents. Small typos are accepted, and so are common aliases ("Peter Parker" for Spider-Man). Characters are grouped into themes in `src/characters.js`. In the lobby the host picks one or more themes (all are on by default), and during the game everyone can see which theme each character is from, including their own.
 
 ## Structure
 

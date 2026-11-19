@@ -71,6 +71,7 @@ io.on('connection', (socket) => {
     manager.kickPlayer(socket.data.roomCode, playerId, targetId);
     for (const sid of sockets.get(targetId) || []) io.to(sid).emit('kicked');
   });
+  handle('room:categories', ({ ids }) => manager.setCategories(socket.data.roomCode, playerId, ids));
   handle('game:start', () => manager.startGame(socket.data.roomCode, playerId));
   handle('game:guess', ({ text }) => manager.guess(socket.data.roomCode, playerId, text));
   handle('game:pass', () => manager.passTurn(socket.data.roomCode, playerId));

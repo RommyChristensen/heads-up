@@ -123,3 +123,38 @@ test('disconnected lobby player is removed after grace period; rejoin keeps seat
   assert.deepStrictEqual(room.players.map((p) => p.id), ['p0', 'p2']);
   cleanup(m);
 });
+
+test('every theme can fill a full room', () => {
+  const cats = require('../src/characters');
+  const all = cats.flatMap((c) => c.characters.map((ch) => ch.name));
+  assert.strictEqual(new Set(all).size, all.length, 'no duplicate characters across themes');
+  for (const c of cats) assert.ok(c.characters.length >= MAX_PLAYERS, `${c.id} has < ${MAX_PLAYERS}`);
+});
+
+test('host picks themes; characters come only from them', () => {
+  const { m, room } = setup(4);
+  assert.throws(() => m.setCategories(room.code, 'p1', ['sports']), /host/);
+  assert.throws(() => m.setCategories(room.code, 'p0', []), /at least one/);
+  assert.throws(() => m.setCategories(room.code, 'p0', ['nope']), /at least one/);
+  m.setCategories(room.code, 'p0', ['sports', 'nope']);
+  assert.deepStrictEqual(room.categoryIds, ['sports']);
+  m.startGame(room.code, 'p0');
+  assert.ok(room.players.every((p) => p.character.category === 'sports'));
+  assert.throws(() => m.setCategories(room.code, 'p0', ['history']), /during a game/);
+  // Players see their own theme but not their character.
+  const me = m.viewFor(room.code, 'p1').players.find((p) => p.id === 'p1');
+  assert.strictEqual(me.category, 'sports');
+  assert.strictEqual(me.character, null);
+  cleanup(m);
+});
+
+test('start fails when the selected pool is smaller than the room', () => {
+  const tiny = [{ id: 'a', label: 'A', emoji: '', characters: [{ name: 'X' }, { name: 'Y' }] },
+                { id: 'b', label: 'B', emoji: '', characters: [{ name: 'Z' }] }];
+  const { m, room } = setup(3, { categories: tiny });
+  m.setCategories(room.code, 'p0', ['a']);
+  assert.throws(() => m.startGame(room.code, 'p0'), /only have 2/);
+  m.setCategories(room.code, 'p0', ['a', 'b']);
+  m.startGame(room.code, 'p0');
+  cleanup(m);
+});

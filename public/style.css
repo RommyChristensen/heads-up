@@ -122,6 +122,24 @@ input:focus { outline: none; border-color: var(--primary); }
 .tag.off { background: #fde2e2; color: var(--bad); }
 .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
 
+.section-head { display: flex; justify-content: space-between; align-items: flex-end; }
+.themes { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme {
+  font: inherit; font-weight: 600; font-size: 0.95rem;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 14px; border-radius: 99px; cursor: pointer;
+  background: var(--surface); color: var(--text); border: 2px solid var(--border);
+  touch-action: manipulation;
+}
+.theme .n { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.theme.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.theme.on .n { color: rgba(255, 255, 255, 0.8); }
+.theme:disabled { cursor: default; }
+.theme:disabled:not(.on) { opacity: 0.45; }
+.small-text { font-size: 0.85rem; margin: 0; }
+.my-panel .hint { margin-top: 6px; font-weight: 600; }
+.card .theme-tag { font-size: 0.75rem; color: var(--muted); }
+
 /* Game */
 .turn-banner {
   display: flex; align-items: center; gap: 14px;

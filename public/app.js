@@ -129,6 +129,38 @@
     if (p && confirm(`Remove ${p.name} from the room?`)) emit('room:kick', { targetId: id });
   };
 
+  const catById = () => new Map(state.categories.map((c) => [c.id, c]));
+  const themeLabel = (id) => { const c = id && catById().get(id); return c ? `${c.emoji} ${c.label}` : ''; };
+
+  $('#themes').onclick = (e) => {
+    const id = e.target.closest('[data-theme]')?.dataset.theme;
+    if (!id || state.hostId !== playerId) return;
+    const selected = new Set(state.categoryIds);
+    if (selected.has(id)) {
+      if (selected.size === 1) return toast('Keep at least one theme', 'bad');
+      selected.delete(id);
+    } else selected.add(id);
+    emit('room:categories', { ids: [...selected] });
+  };
+  $('#themes-all').onclick = () => {
+    emit('room:categories', { ids: state.categories.map((c) => c.id) });
+  };
+
+  function renderThemes(isHost) {
+    const selected = new Set(state.categoryIds);
+    $('#themes').innerHTML = state.categories.map((c) => `
+      <button class="theme ${selected.has(c.id) ? 'on' : ''}" data-theme="${c.id}" ${isHost ? '' : 'disabled'}
+        aria-pressed="${selected.has(c.id)}">${c.emoji} ${esc(c.label)} <span class="n">${c.count}</span></button>`).join('');
+    const allOn = selected.size === state.categories.length;
+    const btn = $('#themes-all');
+    btn.classList.toggle('hidden', !isHost || allOn);
+    const total = state.categories.filter((c) => selected.has(c.id)).reduce((n, c) => n + c.count, 0);
+    $('#themes-hint').textContent = isHost
+      ? `Tap to choose themes · ${total} characters in the pool`
+      : `Chosen by the host · ${total} characters in the pool`;
+    return total;
+  }
+
   function renderLobby() {
     const isHost = state.hostId === playerId;
     $('#room-code').textContent = state.code;
@@ -142,11 +174,15 @@
         ${isHost && p.id !== playerId ? `<button class="btn danger-link" data-kick="${p.id}">Remove</button>` : ''}
       </li>`).join('');
 
+    const poolSize = renderThemes(isHost);
     const enough = state.players.length >= state.minPlayers;
+    const poolOk = poolSize >= state.players.length;
     $('#start-btn').classList.toggle('hidden', !isHost);
-    $('#start-btn').disabled = !enough;
+    $('#start-btn').disabled = !enough || !poolOk;
     $('#lobby-hint').textContent = isHost
-      ? (enough ? 'Everyone in? Start when ready.' : `Waiting for at least ${state.minPlayers} players…`)
+      ? (!enough ? `Waiting for at least ${state.minPlayers} players…`
+        : !poolOk ? 'Not enough characters for everyone — pick more themes.'
+        : 'Everyone in? Start when ready.')
       : 'Waiting for the host to start the game…';
   }
 
@@ -192,7 +228,9 @@
       panel.innerHTML = `<div class="label">You were</div><div class="big-q">${esc(me.character)}</div><div>🏅 Finished #${me.place}</div>`;
     } else {
       panel.className = 'my-panel';
-      panel.innerHTML = `<div class="label">Your character</div><div class="big-q">❓❓❓</div><div>Only you can't see it!</div>`;
+      const multi = state.categoryIds.length > 1;
+      panel.innerHTML = `<div class="label">Your character</div><div class="big-q">❓❓❓</div>
+        <div>Only you can't see it!</div>${multi ? `<div class="hint">Theme: ${esc(themeLabel(me.category))}</div>` : ''}`;
     }
 
     const form = $('#guess-form');
@@ -213,6 +251,7 @@
       <div class="card ${p.id === state.turnId ? 'turn' : ''} ${p.status !== 'playing' ? 'done' : ''}">
         <div class="who">${avatar(p)}<span>${esc(p.name)}</span></div>
         <div class="char">${esc(p.character || '?')}</div>
+        ${state.categoryIds.length > 1 ? `<div class="theme-tag">${esc(themeLabel(p.category))}</div>` : ''}
         <div class="state">${statusText(p)}</div>
       </div>`).join('');
 

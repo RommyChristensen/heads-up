@@ -1,4 +1,4 @@
-const DEFAULT_CHARACTERS = require('./characters');
+const DEFAULT_CATEGORIES = require('./characters');
 
 const MAX_PLAYERS = 10;
 const MIN_PLAYERS = 2;
@@ -67,12 +67,13 @@ class RoomManager {
    * @param {object} opts
    * @param {(code: string) => void} opts.onChange called whenever a room's state changes
    */
-  constructor({ onChange = () => {}, turnMs = TURN_MS, lobbyGraceMs = LOBBY_DISCONNECT_GRACE_MS, characters = DEFAULT_CHARACTERS } = {}) {
+  constructor({ onChange = () => {}, turnMs = TURN_MS, lobbyGraceMs = LOBBY_DISCONNECT_GRACE_MS, categories = DEFAULT_CATEGORIES } = {}) {
     this.rooms = new Map();
     this.onChange = onChange;
     this.turnMs = turnMs;
     this.lobbyGraceMs = lobbyGraceMs;
-    this.characters = characters;
+    this.categories = categories;
+    this.categoryById = new Map(categories.map((c) => [c.id, c]));
   }
 
   // ---------- room management ----------
@@ -103,6 +104,7 @@ class RoomManager {
       turnEndsAt: null,
       turnTimer: null,
       round: 0,
+      categoryIds: this.categories.map((c) => c.id), // all themes by default
       log: [],
     };
     this.rooms.set(code, room);
@@ -210,6 +212,25 @@ class RoomManager {
     this.rooms.delete(room.code);
   }
 
+  setCategories(code, playerId, ids) {
+    const room = this.getRoom(code);
+    if (room.hostId !== playerId) throw new GameError('Only the host can pick the themes.');
+    if (room.phase === 'playing') throw new GameError('You cannot change themes during a game.');
+    const wanted = new Set(Array.isArray(ids) ? ids : []);
+    const valid = this.categories.map((c) => c.id).filter((id) => wanted.has(id)); // keep canonical order
+    if (valid.length === 0) throw new GameError('Pick at least one theme.');
+    room.categoryIds = valid;
+    this.changed(room);
+  }
+
+  /** Characters from the room's selected themes, each tagged with its theme. */
+  poolFor(room) {
+    return room.categoryIds.flatMap((id) => {
+      const cat = this.categoryById.get(id);
+      return cat.characters.map((ch) => ({ ...ch, category: cat.id }));
+    });
+  }
+
   // ---------- game flow ----------
 
   startGame(code, playerId) {
@@ -217,9 +238,12 @@ class RoomManager {
     if (room.hostId !== playerId) throw new GameError('Only the host can start the game.');
     if (room.phase === 'playing') throw new GameError('The game is already running.');
     if (room.players.length < MIN_PLAYERS) throw new GameError(`You need at least ${MIN_PLAYERS} players.`);
-    if (room.players.length > this.characters.length) throw new GameError('Not enough characters.');
+    const pool = this.poolFor(room);
+    if (room.players.length > pool.length) {
+      throw new GameError(`The selected themes only have ${pool.length} characters — pick more themes.`);
+    }
 
-    const chars = shuffle(this.characters);
+    const chars = shuffle(pool);
     room.players.forEach((p, i) => {
       p.character = chars[i];
       p.status = 'playing';
@@ -230,7 +254,9 @@ class RoomManager {
     room.phase = 'playing';
     room.round = 0;
     room.log = [];
-    this.pushLog(room, 'The game has started! Ask yes/no questions to figure out who you are.');
+    const themes = room.categoryIds.map((id) => this.categoryById.get(id).label);
+    const themeText = themes.length === this.categories.length ? 'all themes' : themes.join(', ');
+    this.pushLog(room, `The game has started (${themeText})! Ask yes/no questions to figure out who you are.`);
     this.nextTurn(room);
   }
 
@@ -363,6 +389,8 @@ class RoomManager {
       turnRemainingMs: room.turnEndsAt ? Math.max(0, room.turnEndsAt - Date.now()) : null,
       round: room.round,
       turnOrder: room.turnOrder,
+      categories: this.categories.map((c) => ({ id: c.id, label: c.label, emoji: c.emoji, count: c.characters.length })),
+      categoryIds: room.categoryIds,
       players: room.players.map((p) => {
         const reveal = p.id !== viewerId || p.status === 'won' || room.phase === 'ended';
         return {
@@ -372,6 +400,8 @@ class RoomManager {
           status: p.status,
           place: p.place,
           character: p.character && reveal ? p.character.name : null,
+          // The theme is a fair hint, so everyone (including the player) can see it.
+          category: p.character ? p.character.category : null,
         };
       }),
       log: room.log.slice(-20),
