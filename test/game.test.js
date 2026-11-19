@@ -5,7 +5,7 @@ const { RoomManager, isCorrectGuess, MAX_PLAYERS } = require('../src/game');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function setup(n, opts = {}) {
-  const m = new RoomManager({ turnMs: 60_000, ...opts });
+  const m = new RoomManager({ ...opts });
   const room = m.createRoom('p0', 'Host');
   for (let i = 1; i < n; i++) m.joinRoom(room.code, `p${i}`, `Player ${i}`);
   return { m, room };
@@ -92,11 +92,36 @@ test('correct guesses finish players until one is left', () => {
   cleanup(m);
 });
 
-test('turn advances automatically when the timer expires', async () => {
-  const { m, room } = setup(2, { turnMs: 40 });
+test('turns have no time limit', async () => {
+  const { m, room } = setup(2);
   m.startGame(room.code, 'p0');
   const first = current(m, room);
+  assert.ok(!('turnRemainingMs' in m.viewFor(room.code, first)));
+  await sleep(50);
+  assert.strictEqual(current(m, room), first);
+  cleanup(m);
+});
+
+test('an offline player is skipped on their turn, unless they come back', async () => {
+  const { m, room } = setup(3, { offlineSkipMs: 40 });
+  m.startGame(room.code, 'p0');
+  const first = current(m, room);
+  m.setConnected(room.code, first, false);
+  m.setConnected(room.code, first, true); // quick blip: keeps the turn
   await sleep(70);
+  assert.strictEqual(current(m, room), first);
+  m.setConnected(room.code, first, false);
+  await sleep(70);
+  assert.notStrictEqual(current(m, room), first);
+  cleanup(m);
+});
+
+test('host can skip the current turn', () => {
+  const { m, room } = setup(3);
+  m.startGame(room.code, 'p0');
+  const first = current(m, room);
+  assert.throws(() => m.skipTurn(room.code, room.players.find((p) => p.id !== 'p0').id), /host/);
+  m.skipTurn(room.code, 'p0');
   assert.notStrictEqual(current(m, room), first);
   cleanup(m);
 });

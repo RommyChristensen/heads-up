@@ -14,7 +14,6 @@
 
   const socket = io({ auth: { playerId } });
   let state = null;
-  let turnDeadline = null; // local timestamp when the current turn ends
   let lastTurnKey = null;
 
   // ---------- helpers ----------
@@ -199,6 +198,10 @@
     else { toast('Nope — not quite!', 'bad'); vibrate(200); $('#guess-form').classList.add('shake'); setTimeout(() => $('#guess-form').classList.remove('shake'), 400); }
   };
   $('#pass-btn').onclick = () => emit('game:pass');
+  $('#skip-btn').onclick = () => {
+    const p = state.players.find((x) => x.id === state.turnId);
+    if (p && confirm(`Skip ${p.name}'s turn?`)) emit('game:skip');
+  };
 
   function statusText(p) {
     if (p.status === 'won') return `✅ Guessed it (#${p.place})`;
@@ -215,6 +218,8 @@
 
     $('#round-label').textContent = `Round ${state.round} · ${remaining} left`;
 
+    $('#turn-avatar').innerHTML = turnPlayer ? avatar(turnPlayer) : '';
+    $('#skip-btn').classList.toggle('hidden', state.hostId !== playerId || myTurn);
     const banner = $('#turn-banner');
     banner.classList.toggle('mine', myTurn);
     $('#turn-title').textContent = myTurn ? "🎤 It's your turn!" : `${turnPlayer ? turnPlayer.name : '—'}'s turn`;
@@ -242,7 +247,7 @@
     const turnKey = `${state.round}:${state.turnId}`;
     if (turnKey !== lastTurnKey) {
       lastTurnKey = turnKey;
-      if (myTurn) { vibrate([100, 50, 100]); toast("Your turn! You have 30 seconds."); }
+      if (myTurn) { vibrate([100, 50, 100]); toast("Your turn! Ask away, then guess."); }
     }
 
     // Others, in turn order.
@@ -261,18 +266,6 @@
   function renderLog() {
     $('#log').innerHTML = state.log.slice().reverse().map((l) => `<li>${esc(l.text)}</li>`).join('');
   }
-
-  function tick() {
-    if (state?.phase === 'playing' && turnDeadline) {
-      const ms = Math.max(0, turnDeadline - Date.now());
-      const secs = Math.ceil(ms / 1000);
-      $('#timer-text').textContent = secs;
-      $('#timer-ring').style.strokeDashoffset = String(119.4 * (1 - ms / state.turnMs));
-      $('.timer').classList.toggle('low', secs <= 5);
-    }
-    requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
 
   // ---------- results ----------
   $('#again-btn').onclick = () => emit('game:lobby');
@@ -295,7 +288,6 @@
   socket.on('state', (s) => {
     const prevPhase = state?.phase;
     state = s;
-    turnDeadline = s.turnRemainingMs != null ? Date.now() + s.turnRemainingMs : null;
     if (s.phase === 'lobby') { show('lobby'); renderLobby(); }
     else if (s.phase === 'playing') { show('game'); renderGame(); if (prevPhase !== 'playing') window.scrollTo(0, 0); }
     else { show('results'); renderResults(); if (prevPhase === 'playing') confetti(); }

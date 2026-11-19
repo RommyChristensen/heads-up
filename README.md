@@ -16,11 +16,11 @@ To play on phones, open the server's address (e.g. `http://<your-computer-ip>:30
 
 - **Rooms:** a player creates a room and gets a 4-letter code. They can share it or send an invite link (`?room=CODE`). Rooms hold up to **10 players**. The host can remove players. If the host leaves, another player becomes host.
 - **Start:** when everyone has joined (at least 2 players), the host starts the game. Each player is given a different secret character.
-- **Turns:** players go one at a time in a random order. Each turn lasts **30 seconds**. On your turn you ask the others yes/no questions, then type a guess. You can also pass.
+- **Turns:** players go one at a time in a random order. There's no time limit. On your turn you ask the others yes/no questions, then type a guess or pass.
   - A correct guess means you're done, and your place (#1, #2, …) is recorded.
-  - A wrong guess, a pass, or the timer running out moves play to the next player.
+  - A wrong guess or a pass moves play to the next player. The host can also skip the current player's turn if they've gone quiet.
 - **End:** the game ends when only one player is still guessing. The host can then send everyone back to the lobby for another round.
-- **Reconnects:** each device keeps a player id in local storage. If you refresh or lose connection, you get your seat back. In the lobby, a player who stays offline for 30 seconds is removed. During a game, offline players are skipped when picking whose turn is next.
+- **Reconnects:** each device keeps a player id in local storage. If you refresh or lose connection, you get your seat back. In the lobby, a player who stays offline for 30 seconds is removed. During a game, offline players are skipped when picking whose turn is next, and if a player goes offline during their own turn, they are skipped after 15 seconds.
 
 Guesses ignore case, punctuation and accents. Small typos are accepted, and so are common aliases ("Peter Parker" for Spider-Man). Characters are grouped into themes in `src/characters.js`. In the lobby the host picks one or more themes (all are on by default), and during the game everyone can see which theme each character is from, including their own.
 

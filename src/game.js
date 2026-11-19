@@ -2,7 +2,7 @@ const DEFAULT_CATEGORIES = require('./characters');
 
 const MAX_PLAYERS = 10;
 const MIN_PLAYERS = 2;
-const TURN_MS = 30_000;
+const OFFLINE_SKIP_MS = 15_000; // skip the current player if they're offline this long
 const LOBBY_DISCONNECT_GRACE_MS = 30_000;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O to avoid confusion
 const MAX_LOG = 50;
@@ -67,10 +67,10 @@ class RoomManager {
    * @param {object} opts
    * @param {(code: string) => void} opts.onChange called whenever a room's state changes
    */
-  constructor({ onChange = () => {}, turnMs = TURN_MS, lobbyGraceMs = LOBBY_DISCONNECT_GRACE_MS, categories = DEFAULT_CATEGORIES } = {}) {
+  constructor({ onChange = () => {}, offlineSkipMs = OFFLINE_SKIP_MS, lobbyGraceMs = LOBBY_DISCONNECT_GRACE_MS, categories = DEFAULT_CATEGORIES } = {}) {
     this.rooms = new Map();
     this.onChange = onChange;
-    this.turnMs = turnMs;
+    this.offlineSkipMs = offlineSkipMs;
     this.lobbyGraceMs = lobbyGraceMs;
     this.categories = categories;
     this.categoryById = new Map(categories.map((c) => [c.id, c]));
@@ -101,8 +101,7 @@ class RoomManager {
       players: [],
       turnOrder: [],
       turnIndex: -1,
-      turnEndsAt: null,
-      turnTimer: null,
+      skipTimer: null,
       round: 0,
       categoryIds: this.categories.map((c) => c.id), // all themes by default
       log: [],
@@ -203,11 +202,12 @@ class RoomManager {
         this.pushLog(room, `${next.name} is now the host.`);
       }
     }
+    if (room.phase === 'playing') this.scheduleOfflineSkip(room);
     this.changed(room);
   }
 
   closeRoom(room) {
-    clearTimeout(room.turnTimer);
+    clearTimeout(room.skipTimer);
     room.players.forEach((p) => clearTimeout(p.removeTimer));
     this.rooms.delete(room.code);
   }
@@ -261,7 +261,7 @@ class RoomManager {
   }
 
   nextTurn(room) {
-    clearTimeout(room.turnTimer);
+    clearTimeout(room.skipTimer);
     const n = room.turnOrder.length;
     const isActive = (id) => room.players.find((p) => p.id === id)?.status === 'playing';
     const isOnline = (id) => room.players.find((p) => p.id === id)?.connected;
@@ -280,13 +280,21 @@ class RoomManager {
 
     if (chosen <= room.turnIndex || room.turnIndex === -1) room.round++;
     room.turnIndex = chosen;
-    room.turnEndsAt = Date.now() + this.turnMs;
-    const turnPlayer = room.players.find((p) => p.id === room.turnOrder[chosen]);
-    room.turnTimer = setTimeout(() => {
-      this.pushLog(room, `⏰ Time's up for ${turnPlayer.name}.`);
-      this.nextTurn(room);
-    }, this.turnMs);
+    this.scheduleOfflineSkip(room);
     this.changed(room);
+  }
+
+  /** With no turn timer, an offline player would stall the game — skip them if they don't come back. */
+  scheduleOfflineSkip(room) {
+    clearTimeout(room.skipTimer);
+    room.skipTimer = null;
+    const current = room.players.find((p) => p.id === this.currentTurnId(room));
+    if (!current || current.connected) return;
+    room.skipTimer = setTimeout(() => {
+      if (this.currentTurnId(room) !== current.id || current.connected) return;
+      this.pushLog(room, `${current.name} is offline — skipping their turn.`);
+      this.nextTurn(room);
+    }, this.offlineSkipMs);
   }
 
   currentTurnId(room) {
@@ -318,6 +326,16 @@ class RoomManager {
     return { correct: false };
   }
 
+  /** Host can move things along if the current player has gone quiet. */
+  skipTurn(code, hostId) {
+    const room = this.getRoom(code);
+    if (room.hostId !== hostId) throw new GameError('Only the host can skip a turn.');
+    if (room.phase !== 'playing') throw new GameError('The game is not running.');
+    const current = room.players.find((p) => p.id === this.currentTurnId(room));
+    this.pushLog(room, `⏭️ The host skipped ${current.name}'s turn.`);
+    this.nextTurn(room);
+  }
+
   passTurn(code, playerId) {
     const room = this.requireTurn(code, playerId);
     const player = room.players.find((p) => p.id === playerId);
@@ -330,9 +348,7 @@ class RoomManager {
     if (room.phase !== 'playing') return false;
     const remaining = room.players.filter((p) => p.status === 'playing');
     if (remaining.length > 1) return false;
-    clearTimeout(room.turnTimer);
-    room.turnTimer = null;
-    room.turnEndsAt = null;
+    clearTimeout(room.skipTimer);
     room.phase = 'ended';
     for (const p of remaining) {
       p.status = 'lost';
@@ -346,11 +362,10 @@ class RoomManager {
   backToLobby(code, playerId) {
     const room = this.getRoom(code);
     if (room.hostId !== playerId) throw new GameError('Only the host can do that.');
-    clearTimeout(room.turnTimer);
+    clearTimeout(room.skipTimer);
     room.phase = 'lobby';
     room.turnOrder = [];
     room.turnIndex = -1;
-    room.turnEndsAt = null;
     room.log = [];
     room.players.forEach((p) => {
       p.character = null;
@@ -384,9 +399,7 @@ class RoomManager {
       you: viewerId,
       maxPlayers: MAX_PLAYERS,
       minPlayers: MIN_PLAYERS,
-      turnMs: this.turnMs,
       turnId,
-      turnRemainingMs: room.turnEndsAt ? Math.max(0, room.turnEndsAt - Date.now()) : null,
       round: room.round,
       turnOrder: room.turnOrder,
       categories: this.categories.map((c) => ({ id: c.id, label: c.label, emoji: c.emoji, count: c.characters.length })),
@@ -409,4 +422,4 @@ class RoomManager {
   }
 }
 
-module.exports = { RoomManager, GameError, isCorrectGuess, normalize, MAX_PLAYERS, MIN_PLAYERS, TURN_MS };
+module.exports = { RoomManager, GameError, isCorrectGuess, normalize, MAX_PLAYERS, MIN_PLAYERS };

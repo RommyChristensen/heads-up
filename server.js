@@ -74,6 +74,7 @@ io.on('connection', (socket) => {
   handle('room:categories', ({ ids }) => manager.setCategories(socket.data.roomCode, playerId, ids));
   handle('game:start', () => manager.startGame(socket.data.roomCode, playerId));
   handle('game:guess', ({ text }) => manager.guess(socket.data.roomCode, playerId, text));
+  handle('game:skip', () => manager.skipTurn(socket.data.roomCode, playerId));
   handle('game:pass', () => manager.passTurn(socket.data.roomCode, playerId));
   handle('game:lobby', () => manager.backToLobby(socket.data.roomCode, playerId));
 
