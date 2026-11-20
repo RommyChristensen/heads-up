@@ -42,7 +42,7 @@ function isCorrectGuess(guess, character) {
   return [character.name, ...(character.aliases || [])].some((candidate) => {
     const c = normalize(candidate);
     if (g === c) return true;
-    const tolerance = c.length >= 10 ? 2 : c.length >= 5 ? 1 : 0;
+    const tolerance = c.length >= 10 ? 2 : c.length >= 6 ? 1 : 0;
     return levenshtein(g, c) <= tolerance;
   });
 }

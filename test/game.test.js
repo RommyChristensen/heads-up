@@ -183,3 +183,15 @@ test('start fails when the selected pool is smaller than the room', () => {
   m.startGame(room.code, 'p0');
   cleanup(m);
 });
+
+test('no character name or alias is accepted as a guess for a different character', () => {
+  const all = require('../src/characters').flatMap((c) => c.characters);
+  for (const a of all) {
+    for (const b of all) {
+      if (a === b) continue;
+      for (const g of [a.name, ...(a.aliases || [])]) {
+        assert.ok(!isCorrectGuess(g, b), `"${g}" (${a.name}) is accepted for ${b.name}`);
+      }
+    }
+  }
+});
